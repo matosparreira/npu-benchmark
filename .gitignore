@@ -1,0 +1,9 @@
+# Auto-downloaded ONNX models (fetched on first run by the benchmark scripts)
+*.onnx
+
+# Python virtualenv
+.venv/
+
+# Python caches
+__pycache__/
+*.pyc
