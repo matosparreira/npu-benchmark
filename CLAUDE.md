@@ -4,12 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-A minimal OpenVINO benchmark harness for testing AI inference acceleration on Linux, including Intel NPU (VPU) devices. Two entry points:
+A minimal OpenVINO benchmark harness for testing AI inference acceleration on Linux, including Intel NPU (VPU) devices. Three entry points:
 
 - **`test_npu.py`** — quick smoke test. Downloads a small MNIST ONNX model, compiles it for the single device in `target_device`, and runs a 500-iteration inference benchmark reporting average latency.
 - **`benchmark_resnet.py`** — realistic CPU-vs-NPU comparison. Downloads ResNet-50, then benchmarks every available target in `DEVICES` two ways: synchronous batch-1 (latency) and `AsyncInferQueue` pipeline-full (throughput).
+- **`benchmark_vgg16.py`** — heavier CPU-vs-NPU comparison. Identical methodology to `benchmark_resnet.py` but downloads VGG-16 (~528MB, same `1×3×224×224` input, ~3.5× the compute), to stress the NPU with a denser convolutional workload.
 
-Both auto-download their ONNX model on first run (and reuse it after); the models are git-ignored.
+All three auto-download their ONNX model on first run (and reuse it after); the models are git-ignored.
 
 Code comments and console output are in Portuguese.
 
@@ -25,15 +26,16 @@ This is a NixOS environment. The native AI framework libraries are provided via 
 
 ```bash
 # Enter the nix dev shell (sets LD_LIBRARY_PATH for native libs)
-nix-shell
+nix-shell;source .venv/bin/activate;python benchmark_resnet.py
 
 # Inside the shell, activate the venv and run a benchmark
 source .venv/bin/activate
 python test_npu.py          # quick MNIST smoke test (single device)
 python benchmark_resnet.py  # ResNet-50 CPU-vs-NPU comparison
+python benchmark_vgg16.py   # VGG-16 (heavier) CPU-vs-NPU comparison
 ```
 
-There are no tests, linters, or build steps — the two `*.py` scripts are the only entry points.
+There are no tests, linters, or build steps — the three `*.py` scripts are the only entry points.
 
 ## Key detail
 
@@ -62,4 +64,4 @@ and `NPU_COMPILER_VERSION` reads `0`. This is **not** an OpenVINO version issue 
 
 ### NPU vs CPU performance — depends entirely on the model
 
-Measured here: on **MNIST** the CPU is ~3.6x *faster* (the model is too small — per-inference dispatch overhead dominates and the NPU never does real work). On **ResNet-50** the NPU is ~5.8x lower latency and ~6x higher throughput (real compute, where the NPU's dedicated MAC arrays win). So a CPU-faster result on a trivial model is expected, not a regression — use `benchmark_resnet.py` to see the NPU's actual advantage.
+Measured here: on **MNIST** the CPU is ~3.6x *faster* (the model is too small — per-inference dispatch overhead dominates and the NPU never does real work). On **ResNet-50** the NPU is ~5.8x lower latency and ~6x higher throughput (real compute, where the NPU's dedicated MAC arrays win). On **VGG-16** the NPU is ~4.95x lower latency (12.87 ms vs 63.74 ms) and ~5x higher throughput (78 vs 15 inf/s) — a much heavier model, so absolute NPU latency is higher than ResNet-50's while the ~5x advantage holds. So a CPU-faster result on a trivial model is expected, not a regression — use `benchmark_resnet.py` or `benchmark_vgg16.py` to see the NPU's actual advantage.
