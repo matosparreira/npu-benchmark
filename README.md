@@ -53,25 +53,25 @@ Measured on Intel Meteor Lake (NPU arch 3720, "Intel AI Boost"):
 | Device | Avg latency | Throughput |
 | --- | ---: | ---: |
 | CPU | 0.10 ms | ~9,660 inf/s |
-| NPU | 0.37 ms | ~2,690 inf/s |
+| NPU | 0.32 ms | ~3,130 inf/s |
 
 **ResNet-50** (realistic model — real compute):
 
 | Device | Latency (sync, batch-1) | Throughput (async) |
 | --- | ---: | ---: |
-| CPU | 19.9 ms | ~49 inf/s |
-| NPU | **3.4 ms** | **~298 inf/s** |
+| CPU | 20.5 ms | ~48 inf/s |
+| NPU | **3.5 ms** | **~292 inf/s** |
 
-→ On ResNet-50 the NPU is **~5.8× lower latency** and **~6× higher throughput**.
+→ On ResNet-50 the NPU is **~5.9× lower latency** and **~6.1× higher throughput**.
 
 **VGG-16** (heavier model — ~3.5× the compute):
 
 | Device | Latency (sync, batch-1) | Throughput (async) |
 | --- | ---: | ---: |
-| CPU | 63.74 ms | ~15 inf/s |
-| NPU | **12.87 ms** | **~78 inf/s** |
+| CPU | 64.32 ms | ~15 inf/s |
+| NPU | **13.45 ms** | **~73 inf/s** |
 
-→ On VGG-16 the NPU is **~4.95× lower latency** and **~5× higher throughput**.
+→ On VGG-16 the NPU is **~4.8× lower latency** and **~5× higher throughput**.
 Absolute NPU latency is higher than ResNet-50's (the model is heavier), but the
 ~5× advantage over the CPU holds.
 

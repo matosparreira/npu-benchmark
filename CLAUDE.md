@@ -43,7 +43,7 @@ The benchmark target device is set via `target_device` in `test_npu.py:23` (curr
 
 ## NPU support (Meteor Lake / arch 3720, "Intel AI Boost")
 
-The NPU **works end-to-end** (compiles and runs, ~0.29 ms/inference on the MNIST model), but only because of two fixes in `shell.nix`. Both are required:
+The NPU **works end-to-end** (compiles and runs, ~0.32 ms/inference on the MNIST model), but only because of two fixes in `shell.nix`. Both are required:
 
 1. **`level-zero`** — provides `libze_loader.so`, needed for OpenVINO to *detect* the NPU at all (see Environment section above).
 2. **`intel-npu-compiler.nix`** — provides `libnpu_driver_compiler.so`, needed to *compile* models for the NPU.
@@ -64,4 +64,4 @@ and `NPU_COMPILER_VERSION` reads `0`. This is **not** an OpenVINO version issue 
 
 ### NPU vs CPU performance — depends entirely on the model
 
-Measured here: on **MNIST** the CPU is ~3.6x *faster* (the model is too small — per-inference dispatch overhead dominates and the NPU never does real work). On **ResNet-50** the NPU is ~5.8x lower latency and ~6x higher throughput (real compute, where the NPU's dedicated MAC arrays win). On **VGG-16** the NPU is ~4.95x lower latency (12.87 ms vs 63.74 ms) and ~5x higher throughput (78 vs 15 inf/s) — a much heavier model, so absolute NPU latency is higher than ResNet-50's while the ~5x advantage holds. So a CPU-faster result on a trivial model is expected, not a regression — use `benchmark_resnet.py` or `benchmark_vgg16.py` to see the NPU's actual advantage.
+Measured here: on **MNIST** the CPU is ~3.2x *faster* (the model is too small — per-inference dispatch overhead dominates and the NPU never does real work). On **ResNet-50** the NPU is ~5.9x lower latency and ~6.1x higher throughput (real compute, where the NPU's dedicated MAC arrays win). On **VGG-16** the NPU is ~4.8x lower latency (13.45 ms vs 64.32 ms) and ~5x higher throughput (73 vs 15 inf/s) — a much heavier model, so absolute NPU latency is higher than ResNet-50's while the ~5x advantage holds. So a CPU-faster result on a trivial model is expected, not a regression — use `benchmark_resnet.py` or `benchmark_vgg16.py` to see the NPU's actual advantage.
