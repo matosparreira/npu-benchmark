@@ -10,8 +10,9 @@ A minimal OpenVINO benchmark harness for testing AI inference acceleration on Li
 - **`benchmark_resnet.py`** — realistic CPU/GPU/NPU comparison. Downloads ResNet-50, then benchmarks every available target in `DEVICES` (`CPU`, `GPU`, `NPU`) two ways: synchronous batch-1 (latency) and `AsyncInferQueue` pipeline-full (throughput).
 - **`benchmark_vgg16.py`** — heavier CPU-vs-NPU comparison. Identical methodology to `benchmark_resnet.py` but downloads VGG-16 (~528MB, same `1×3×224×224` input, ~3.5× the compute), to stress the NPU with a denser convolutional workload.
 - **`benchmark_vgg19.py`** — heaviest CPU-vs-NPU comparison. Identical methodology again but downloads VGG-19 (`vgg19-bn-7`, ~574MB, same `1×3×224×224` input, ~19.6 GFLOPs / ~1.26× VGG-16), the densest convolutional workload in the set.
+- **`benchmark_power.py`** — energy comparison. Runs sustained ResNet-50 load on each available device and reads Intel RAPL to report package power (W), energy per inference (mJ), and efficiency (inf/s per W) — the performance-per-watt axis the other benchmarks don't measure. Needs RAPL read access (see "Measuring power" below).
 
-All four auto-download their ONNX model on first run (and reuse it after); the models are git-ignored.
+The four download-based scripts auto-download their ONNX model on first run (and reuse it after); the models are git-ignored. `benchmark_power.py` reuses the ResNet-50 download.
 
 Code comments and console output are in Portuguese.
 
@@ -35,9 +36,13 @@ python test_npu.py          # quick MNIST smoke test (single device)
 python benchmark_resnet.py  # ResNet-50 CPU-vs-NPU comparison
 python benchmark_vgg16.py   # VGG-16 (heavier) CPU-vs-NPU comparison
 python benchmark_vgg19.py   # VGG-19 (heaviest) CPU-vs-NPU comparison
+
+# Power draw per device (needs RAPL read access, see "Measuring power" below)
+sudo chmod a+r /sys/class/powercap/intel-rapl:*/energy_uj  # once, reverts on reboot
+python benchmark_power.py   # energy / efficiency per device (CPU/GPU/NPU)
 ```
 
-There are no tests, linters, or build steps — the four `*.py` scripts are the only entry points.
+There are no tests, linters, or build steps — the five `*.py` scripts are the only entry points.
 
 ## Key detail
 
@@ -70,7 +75,21 @@ Measured here: on **MNIST** the CPU is ~3.2x *faster* (the model is too small �
 
 ### GPU vs NPU — the GPU wins wall-clock, the NPU wins watts
 
-When the iGPU is enabled (see "GPU support" below), the three comparison benchmarks run all of `CPU`, `GPU`, `NPU`. Measured 3-way (latency ms / throughput inf/s): ResNet-50 — CPU 20.43/48, **GPU 2.88/332**, NPU 3.56/290; VGG-16 — CPU 65.06/11, **GPU 8.00/113**, NPU 13.63/74; VGG-19 — CPU 79.76/9, **GPU 12.11/81**, NPU 15.69/64. The **GPU is fastest on every real model** (~6.6–8.1x lower latency than CPU; the NPU ~4.8–5.7x), because the Arc iGPU has far more raw compute. The NPU's real advantage is **performance-per-watt**, which this harness does not measure — so "GPU faster than NPU" here is wall-clock throughput, not energy efficiency.
+When the iGPU is enabled (see "GPU support" below), the three comparison benchmarks run all of `CPU`, `GPU`, `NPU`. Measured 3-way (latency ms / throughput inf/s): ResNet-50 — CPU 20.43/48, **GPU 2.88/332**, NPU 3.56/290; VGG-16 — CPU 65.06/11, **GPU 8.00/113**, NPU 13.63/74; VGG-19 — CPU 79.76/9, **GPU 12.11/81**, NPU 15.69/64. The **GPU is fastest on every real model** (~6.6–8.1x lower latency than CPU; the NPU ~4.8–5.7x), because the Arc iGPU has far more raw compute. The NPU's real advantage is **performance-per-watt** — see below.
+
+### Power / energy per device (`benchmark_power.py`)
+
+`benchmark_power.py` measures it. ResNet-50, sustained load, Intel RAPL (idle package 9.28 W): CPU 48 inf/s @ 28.02 W (584.7 mJ/inf, 1.71 inf/s/W); GPU 333 inf/s @ 27.99 W (83.9 mJ/inf, 11.91 inf/s/W); **NPU 294 inf/s @ 22.87 W (77.8 mJ/inf, 12.85 inf/s/W)**. So although the GPU wins throughput, the **NPU is the most efficient** — ~88% of the GPU's throughput at ~82% of the power, the lowest energy per inference, and the best inf/s-per-watt. The CPU is ~7.5x worse energy-per-inference. This is the trade-off the NPU exists for.
+
+## Measuring power
+
+RAPL energy lives at `/sys/class/powercap/intel-rapl:0/energy_uj` (microjoules, cumulative, wraps at `max_energy_range_uj`). Since the CVE-2020-8694 mitigation it is **root-only**, so `benchmark_power.py` exits with an instruction unless you grant read access once per boot:
+
+```bash
+sudo chmod a+r /sys/class/powercap/intel-rapl:*/energy_uj
+```
+
+**Key limitation:** RAPL only exposes the `package-0` domain (plus `core`/`uncore` subdomains) — CPU, GPU, and NPU all share one package energy counter; there is **no per-accelerator RAPL domain**. So the script measures *whole-package* power while the workload runs on each device and subtracts idle. That's a fair relative comparison (energy-per-inference for the same task per device), but it does not attribute exact watts to each silicon block. `sudo` is interactive (needs a TTY), so the chmod must be run by the user in a real terminal, not via OpenVINO's process.
 
 ## GPU support (Intel Arc iGPU, Meteor Lake)
 
