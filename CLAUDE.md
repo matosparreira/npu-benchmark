@@ -9,8 +9,9 @@ A minimal OpenVINO benchmark harness for testing AI inference acceleration on Li
 - **`test_npu.py`** — quick smoke test. Downloads a small MNIST ONNX model, compiles it for the single device in `target_device`, and runs a 500-iteration inference benchmark reporting average latency.
 - **`benchmark_resnet.py`** — realistic CPU-vs-NPU comparison. Downloads ResNet-50, then benchmarks every available target in `DEVICES` two ways: synchronous batch-1 (latency) and `AsyncInferQueue` pipeline-full (throughput).
 - **`benchmark_vgg16.py`** — heavier CPU-vs-NPU comparison. Identical methodology to `benchmark_resnet.py` but downloads VGG-16 (~528MB, same `1×3×224×224` input, ~3.5× the compute), to stress the NPU with a denser convolutional workload.
+- **`benchmark_vgg19.py`** — heaviest CPU-vs-NPU comparison. Identical methodology again but downloads VGG-19 (`vgg19-bn-7`, ~574MB, same `1×3×224×224` input, ~19.6 GFLOPs / ~1.26× VGG-16), the densest convolutional workload in the set.
 
-All three auto-download their ONNX model on first run (and reuse it after); the models are git-ignored.
+All four auto-download their ONNX model on first run (and reuse it after); the models are git-ignored.
 
 Code comments and console output are in Portuguese.
 
@@ -33,6 +34,7 @@ source .venv/bin/activate
 python test_npu.py          # quick MNIST smoke test (single device)
 python benchmark_resnet.py  # ResNet-50 CPU-vs-NPU comparison
 python benchmark_vgg16.py   # VGG-16 (heavier) CPU-vs-NPU comparison
+python benchmark_vgg19.py   # VGG-19 (heaviest) CPU-vs-NPU comparison
 ```
 
 There are no tests, linters, or build steps — the three `*.py` scripts are the only entry points.
@@ -64,4 +66,4 @@ and `NPU_COMPILER_VERSION` reads `0`. This is **not** an OpenVINO version issue 
 
 ### NPU vs CPU performance — depends entirely on the model
 
-Measured here: on **MNIST** the CPU is ~3.2x *faster* (the model is too small — per-inference dispatch overhead dominates and the NPU never does real work). On **ResNet-50** the NPU is ~5.9x lower latency and ~6.1x higher throughput (real compute, where the NPU's dedicated MAC arrays win). On **VGG-16** the NPU is ~4.8x lower latency (13.45 ms vs 64.32 ms) and ~5x higher throughput (73 vs 15 inf/s) — a much heavier model, so absolute NPU latency is higher than ResNet-50's while the ~5x advantage holds. So a CPU-faster result on a trivial model is expected, not a regression — use `benchmark_resnet.py` or `benchmark_vgg16.py` to see the NPU's actual advantage.
+Measured here: on **MNIST** the CPU is ~3.2x *faster* (the model is too small — per-inference dispatch overhead dominates and the NPU never does real work). On **ResNet-50** the NPU is ~5.9x lower latency and ~6.1x higher throughput (real compute, where the NPU's dedicated MAC arrays win). On **VGG-16** the NPU is ~4.8x lower latency (13.45 ms vs 64.32 ms) and ~5x higher throughput (73 vs 15 inf/s) — a much heavier model, so absolute NPU latency is higher than ResNet-50's while the ~5x advantage holds. On **VGG-19** (the heaviest, ~19.6 GFLOPs) the NPU is ~5.1x lower latency (15.69 ms vs 80.25 ms) and ~6.4x higher throughput (64 vs 10 inf/s) — highest absolute NPU latency of the set, but its densest convolutions give the NPU its best throughput advantage. So a CPU-faster result on a trivial model is expected, not a regression — use `benchmark_resnet.py`, `benchmark_vgg16.py`, or `benchmark_vgg19.py` to see the NPU's actual advantage.

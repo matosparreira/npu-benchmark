@@ -15,6 +15,7 @@ throughput, with a focus on getting the Intel NPU working under NixOS.
 | `test_npu.py` | Quick smoke test. Downloads a small MNIST model and runs a 500-iteration latency benchmark on the single device set in `target_device`. |
 | `benchmark_resnet.py` | Realistic CPU-vs-NPU comparison. Downloads ResNet-50 and benchmarks every available device two ways: synchronous batch-1 (latency) and `AsyncInferQueue` pipeline-full (throughput). |
 | `benchmark_vgg16.py` | Heavier CPU-vs-NPU comparison. Same methodology as `benchmark_resnet.py` but downloads VGG-16 (~528MB, same `1×3×224×224` input, ~3.5× the compute) to stress the NPU with a denser convolutional workload. |
+| `benchmark_vgg19.py` | Heaviest CPU-vs-NPU comparison. Same methodology again but downloads VGG-19 (`vgg19-bn-7`, ~574MB, same `1×3×224×224` input, ~19.6 GFLOPs / ~1.26× VGG-16) — the densest convolutional workload in the set. |
 
 All scripts auto-download their ONNX model on first run and reuse it afterwards.
 The models are git-ignored.
@@ -38,6 +39,7 @@ source .venv/bin/activate
 python test_npu.py          # MNIST smoke test (single device)
 python benchmark_resnet.py  # ResNet-50 CPU-vs-NPU comparison
 python benchmark_vgg16.py   # VGG-16 (heavier) CPU-vs-NPU comparison
+python benchmark_vgg19.py   # VGG-19 (heaviest) CPU-vs-NPU comparison
 ```
 
 `test_npu.py` targets the device named in `target_device` (currently `"NPU"`;
@@ -74,6 +76,17 @@ Measured on Intel Meteor Lake (NPU arch 3720, "Intel AI Boost"):
 → On VGG-16 the NPU is **~4.8× lower latency** and **~5× higher throughput**.
 Absolute NPU latency is higher than ResNet-50's (the model is heavier), but the
 ~5× advantage over the CPU holds.
+
+**VGG-19** (heaviest model — ~19.6 GFLOPs):
+
+| Device | Latency (sync, batch-1) | Throughput (async) |
+| --- | ---: | ---: |
+| CPU | 80.25 ms | ~10 inf/s |
+| NPU | **15.69 ms** | **~64 inf/s** |
+
+→ On VGG-19 the NPU is **~5.1× lower latency** and **~6.4× higher throughput**.
+The heaviest model in the set: NPU latency is the highest measured (15.69 ms),
+yet the dense convolutions give the NPU its best throughput advantage of all.
 
 The flip is the whole lesson: on a trivial model the CPU wins because dispatch
 overhead dominates and the NPU never does real work; on a real network the NPU's
