@@ -57,41 +57,44 @@ Measured on Intel Meteor Lake (NPU arch 3720, "Intel AI Boost"):
 | CPU | 0.10 ms | ~9,660 inf/s |
 | NPU | 0.32 ms | ~3,130 inf/s |
 
+The three comparison benchmarks run all available targets — CPU, the integrated
+Arc **GPU**, and the **NPU** — latency (sync, batch-1) and throughput (async):
+
 **ResNet-50** (realistic model — real compute):
 
-| Device | Latency (sync, batch-1) | Throughput (async) |
-| --- | ---: | ---: |
-| CPU | 20.5 ms | ~48 inf/s |
-| NPU | **3.5 ms** | **~292 inf/s** |
+| Device | Latency (sync, batch-1) | Throughput (async) | vs CPU |
+| --- | ---: | ---: | ---: |
+| CPU | 20.43 ms | ~48 inf/s | — |
+| GPU | **2.88 ms** | **~332 inf/s** | ~7.1× lat / ~7.0× thr |
+| NPU | 3.56 ms | ~290 inf/s | ~5.7× lat / ~6.1× thr |
 
-→ On ResNet-50 the NPU is **~5.9× lower latency** and **~6.1× higher throughput**.
+**VGG-16** (heavier model — ~15.5 GFLOPs):
 
-**VGG-16** (heavier model — ~3.5× the compute):
-
-| Device | Latency (sync, batch-1) | Throughput (async) |
-| --- | ---: | ---: |
-| CPU | 64.32 ms | ~15 inf/s |
-| NPU | **13.45 ms** | **~73 inf/s** |
-
-→ On VGG-16 the NPU is **~4.8× lower latency** and **~5× higher throughput**.
-Absolute NPU latency is higher than ResNet-50's (the model is heavier), but the
-~5× advantage over the CPU holds.
+| Device | Latency (sync, batch-1) | Throughput (async) | vs CPU |
+| --- | ---: | ---: | ---: |
+| CPU | 65.06 ms | ~11 inf/s | — |
+| GPU | **8.00 ms** | **~113 inf/s** | ~8.1× lat / ~10.1× thr |
+| NPU | 13.63 ms | ~74 inf/s | ~4.8× lat / ~6.6× thr |
 
 **VGG-19** (heaviest model — ~19.6 GFLOPs):
 
-| Device | Latency (sync, batch-1) | Throughput (async) |
-| --- | ---: | ---: |
-| CPU | 80.25 ms | ~10 inf/s |
-| NPU | **15.69 ms** | **~64 inf/s** |
+| Device | Latency (sync, batch-1) | Throughput (async) | vs CPU |
+| --- | ---: | ---: | ---: |
+| CPU | 79.76 ms | ~9 inf/s | — |
+| GPU | **12.11 ms** | **~81 inf/s** | ~6.6× lat / ~9.2× thr |
+| NPU | 15.69 ms | ~64 inf/s | ~5.1× lat / ~7.2× thr |
 
-→ On VGG-19 the NPU is **~5.1× lower latency** and **~6.4× higher throughput**.
-The heaviest model in the set: NPU latency is the highest measured (15.69 ms),
-yet the dense convolutions give the NPU its best throughput advantage of all.
+Two lessons here:
 
-The flip is the whole lesson: on a trivial model the CPU wins because dispatch
-overhead dominates and the NPU never does real work; on a real network the NPU's
-dedicated MAC arrays pull far ahead — at a fraction of the CPU's power draw. A
-CPU-faster result on MNIST is expected, not a regression.
+- **The CPU loses badly on any real model.** On the tiny MNIST model the CPU
+  *wins* because per-inference dispatch overhead dominates and the accelerators
+  never do real work — that flip is expected, not a regression. On ResNet-50 /
+  VGG-16 / VGG-19 both accelerators pull 5–8× ahead.
+- **The GPU is fastest in raw latency and throughput; the NPU trails closely.**
+  The Arc iGPU has far more raw compute, so it wins the wall-clock race. The
+  NPU's real edge is **power efficiency** (it does this at a fraction of the
+  GPU's/CPU's watts), which this harness does not measure — so "GPU faster than
+  NPU" here is about throughput-per-second, not performance-per-watt.
 
 ## The NixOS NPU fix
 
@@ -111,5 +114,22 @@ both wired into `shell.nix`:
 `intel-npu-compiler.nix` packages Intel's *prebuilt* compiler, extracted from the
 official `linux-npu-driver` release. Its version **must match** the installed
 `intel-npu-driver` package (currently 1.28.0).
+
+## The NixOS GPU fix
+
+Enabling the integrated Arc GPU is the same kind of problem, one level up: the
+OpenVINO GPU plugin talks **OpenCL**, and the loader + Intel ICD must be on the
+path or the GPU is never detected (`available_devices` shows only CPU/NPU). Two
+pieces, both wired into `shell.nix`:
+
+1. **OpenCL loader** (`ocl-icd` → `libOpenCL.so`) — added to `LD_LIBRARY_PATH`.
+2. **Intel Compute Runtime / NEO** (`intel-compute-runtime` → `libigdrcl.so`) —
+   the OpenCL ICD for Intel GPUs. The loader finds it via the
+   `OCL_ICD_VENDORS` env var, which `shell.nix` points at the package's
+   `etc/OpenCL/vendors` directory.
+
+With both in place OpenVINO reports `['CPU', 'GPU', 'NPU']` and the GPU
+(`Intel(R) Arc(TM) Graphics (iGPU)`) compiles and runs models. `/dev/dri/renderD128`
+must also be accessible (be in the `render` group).
 
 See [`CLAUDE.md`](CLAUDE.md) for the full diagnosis and maintenance notes.

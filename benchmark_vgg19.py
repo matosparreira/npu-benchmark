@@ -11,7 +11,7 @@ import numpy as np
 MODEL_URL = "https://github.com/onnx/models/raw/main/validated/vision/classification/vgg/model/vgg19-bn-7.onnx"
 MODEL_PATH = "vgg19-bn-7.onnx"
 
-DEVICES = ["CPU", "NPU"]
+DEVICES = ["CPU", "GPU", "NPU"]
 ITERATIONS = 200
 INPUT_SHAPE = [1, 3, 224, 224]  # batch=1, RGB, 224x224
 
@@ -79,11 +79,13 @@ def run_comparison():
         print(f"{device:12}{sync[device]:>16.2f}{asyncr[device]:>18.0f}")
     print("==================================================")
 
-    # Comparação direta quando ambos os dispositivos estão presentes.
-    if "CPU" in targets and "NPU" in targets:
-        lat = sync["CPU"] / sync["NPU"]
-        thr = asyncr["NPU"] / asyncr["CPU"]
-        print(f"NPU vs CPU -> latência: {lat:.2f}x menor | débito: {thr:.2f}x maior")
+    # Comparação direta de cada acelerador face à CPU (referência).
+    if "CPU" in targets:
+        for dev in ("GPU", "NPU"):
+            if dev in targets:
+                lat = sync["CPU"] / sync[dev]
+                thr = asyncr[dev] / asyncr["CPU"]
+                print(f"{dev} vs CPU -> latência: {lat:.2f}x menor | débito: {thr:.2f}x maior")
 
 if __name__ == "__main__":
     run_comparison()
